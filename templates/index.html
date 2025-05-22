@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Wine Study Quiz</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            margin: 0;
+            padding: 20px;
+            background-color: #f5f5f5;
+            color: #333;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background-color: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #2c3e50;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .input-section {
+            margin-bottom: 30px;
+            text-align: center;
+        }
+        input[type="text"] {
+            padding: 10px;
+            width: 60%;
+            border: 2px solid #ddd;
+            border-radius: 5px;
+            font-size: 16px;
+        }
+        button {
+            padding: 10px 20px;
+            background-color: #3498db;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            margin-left: 10px;
+        }
+        button:hover {
+            background-color: #2980b9;
+        }
+        .quiz-section {
+            display: none;
+        }
+        .question {
+            margin-bottom: 30px;
+            padding: 20px;
+            background-color: #f8f9fa;
+            border-radius: 5px;
+        }
+        .options {
+            display: grid;
+            gap: 10px;
+            margin-top: 15px;
+        }
+        .option {
+            padding: 10px;
+            border: 2px solid #ddd;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        .option:hover {
+            background-color: #e9ecef;
+        }
+        .option.selected {
+            background-color: #3498db;
+            color: white;
+            border-color: #3498db;
+        }
+        .option.correct {
+            background-color: #2ecc71;
+            color: white;
+            border-color: #2ecc71;
+        }
+        .option.incorrect {
+            background-color: #e74c3c;
+            color: white;
+            border-color: #e74c3c;
+        }
+        .feedback {
+            margin-top: 10px;
+            padding: 10px;
+            border-radius: 5px;
+            display: none;
+        }
+        .feedback.correct {
+            background-color: #d4edda;
+            color: #155724;
+            display: block;
+        }
+        .feedback.incorrect {
+            background-color: #f8d7da;
+            color: #721c24;
+            display: block;
+        }
+        .loading {
+            text-align: center;
+            display: none;
+        }
+        .loading::after {
+            content: "Loading...";
+            animation: dots 1.5s infinite;
+        }
+        @keyframes dots {
+            0%, 20% { content: "Loading."; }
+            40% { content: "Loading.."; }
+            60%, 100% { content: "Loading..."; }
+        }
+        .study-guide {
+            display: none;
+            margin-top: 30px;
+            padding: 20px;
+            background-color: #f8f9fa;
+            border-radius: 5px;
+        }
+        .study-guide h2 {
+            color: #2c3e50;
+            margin-bottom: 20px;
+        }
+        .study-guide-content {
+            white-space: pre-wrap;
+            line-height: 1.8;
+        }
+        .results-summary {
+            text-align: center;
+            margin: 20px 0;
+            font-size: 1.2em;
+            color: #2c3e50;
+        }
+        .study-guide-loading {
+            text-align: center;
+            margin: 20px 0;
+            color: #666;
+            font-style: italic;
+        }
+        .spinner {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #3498db;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-right: 10px;
+            vertical-align: middle;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Wine Study Quiz</h1>
+        
+        <div class="input-section">
+            <input type="text" id="topic" placeholder="Enter a wine-related topic (e.g., Pruning, Fermentation)">
+            <button onclick="getQuestions()">Generate Quiz</button>
+        </div>
+
+        <div class="loading" id="loading"></div>
+        
+        <div class="quiz-section" id="quiz-section">
+            <div id="questions-container"></div>
+            <div class="results-summary" id="results-summary"></div>
+            <div class="study-guide" id="study-guide">
+                <h2>Study Guide</h2>
+                <div class="study-guide-loading" id="study-guide-loading">
+                    <div class="spinner"></div>
+                    Generating study guide for incorrect answers...
+                </div>
+                <div class="study-guide-content" id="study-guide-content"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let currentQuestions = [];
+        let answeredQuestions = 0;
+        let incorrectQuestions = [];
+
+        function getQuestions() {
+            const topic = document.getElementById('topic').value.trim();
+            if (!topic) {
+                alert('Please enter a topic');
+                return;
+            }
+
+            const loading = document.getElementById('loading');
+            const quizSection = document.getElementById('quiz-section');
+            loading.style.display = 'block';
+            quizSection.style.display = 'none';
+
+            fetch('/get_questions', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ topic: topic })
+            })
+            .then(response => response.json())
+            .then(data => {
+                loading.style.display = 'none';
+                if (data.error) {
+                    alert('Error: ' + data.error);
+                    return;
+                }
+                currentQuestions = data.questions;
+                answeredQuestions = 0;
+                incorrectQuestions = [];
+                displayQuestions(data.questions);
+            })
+            .catch(error => {
+                loading.style.display = 'none';
+                alert('Error: ' + error);
+            });
+        }
+
+        function displayQuestions(questions) {
+            const container = document.getElementById('questions-container');
+            container.innerHTML = '';
+            
+            questions.forEach((q, index) => {
+                const questionDiv = document.createElement('div');
+                questionDiv.className = 'question';
+                questionDiv.innerHTML = `
+                    <h3>Question ${index + 1}</h3>
+                    <p>${q.question}</p>
+                    <div class="options">
+                        ${q.options.map(option => `
+                            <div class="option" onclick="checkAnswer(this, '${option}', '${q.correct_answer}', '${q.question}')">
+                                ${option}
+                            </div>
+                        `).join('')}
+                    </div>
+                    <div class="feedback"></div>
+                `;
+                container.appendChild(questionDiv);
+            });
+
+            document.getElementById('quiz-section').style.display = 'block';
+            document.getElementById('results-summary').style.display = 'none';
+            document.getElementById('study-guide').style.display = 'none';
+        }
+
+        function checkAnswer(element, selectedAnswer, correctAnswer, question) {
+            const questionDiv = element.closest('.question');
+            const options = questionDiv.querySelectorAll('.option');
+            const feedback = questionDiv.querySelector('.feedback');
+
+            // Remove previous selections
+            options.forEach(opt => {
+                opt.classList.remove('selected', 'correct', 'incorrect');
+            });
+
+            // Mark selected answer
+            element.classList.add('selected');
+
+            // Check if correct - compare the full answer text
+            if (selectedAnswer.trim() === correctAnswer.trim()) {
+                element.classList.add('correct');
+                feedback.textContent = 'Correct!';
+                feedback.className = 'feedback correct';
+            } else {
+                element.classList.add('incorrect');
+                options.forEach(opt => {
+                    if (opt.textContent.trim() === correctAnswer.trim()) {
+                        opt.classList.add('correct');
+                    }
+                });
+                feedback.textContent = `Incorrect. The correct answer is: ${correctAnswer}`;
+                feedback.className = 'feedback incorrect';
+                incorrectQuestions.push(question);
+            }
+
+            answeredQuestions++;
+            if (answeredQuestions === currentQuestions.length) {
+                showResults();
+            }
+        }
+
+        function showResults() {
+            const correctCount = currentQuestions.length - incorrectQuestions.length;
+            const resultsDiv = document.getElementById('results-summary');
+            resultsDiv.innerHTML = `You got ${correctCount} out of ${currentQuestions.length} questions correct!`;
+            resultsDiv.style.display = 'block';
+
+            if (incorrectQuestions.length > 0) {
+                getStudyGuide();
+            }
+        }
+
+        function getStudyGuide() {
+            const studyGuideDiv = document.getElementById('study-guide');
+            const studyGuideContent = document.getElementById('study-guide-content');
+            const studyGuideLoading = document.getElementById('study-guide-loading');
+            
+            studyGuideDiv.style.display = 'block';
+            studyGuideContent.style.display = 'none';
+            studyGuideLoading.style.display = 'block';
+
+            // Create an array of promises for each incorrect question
+            const studyGuidePromises = incorrectQuestions.map(question => 
+                fetch('/get_study_guide', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ incorrect_questions: [question] })
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.error) {
+                        throw new Error(data.error);
+                    }
+                    return data.study_guide;
+                })
+            );
+
+            // Wait for all study guides to be generated
+            Promise.all(studyGuidePromises)
+                .then(studyGuides => {
+                    // Combine all study guides with clear separation
+                    const combinedGuide = studyGuides
+                        .map((guide, index) => `Study Guide for Question ${index + 1}:\n${guide}\n\n${'-'.repeat(50)}\n`)
+                        .join('\n');
+                    
+                    studyGuideContent.textContent = combinedGuide;
+                    studyGuideContent.style.display = 'block';
+                    studyGuideLoading.style.display = 'none';
+                })
+                .catch(error => {
+                    studyGuideLoading.style.display = 'none';
+                    studyGuideContent.textContent = `Error generating study guide: ${error.message}`;
+                    studyGuideContent.style.display = 'block';
+                });
+        }
+    </script>
+</body>
+</html> 
